@@ -1,9 +1,8 @@
 import os
 import datetime
+import math
 from flask import Flask, render_template_string, jsonify, request
 import yfinance as yf
-import pandas as pd
-import ta
 import requests
 from bs4 import BeautifulSoup
 
@@ -51,16 +50,45 @@ def fetch_economic_calendar():
         pass
     return events
 
-def analyze_market_condition(df, asset):
-    try:
-        atr = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=14)
-        current_atr = atr.iloc[-1] if not atr.empty else 0
-        avg_atr = atr.rolling(window=20).mean().iloc[-1] if not atr.empty else 0
+def calculate_indicators(prices):
+    """Автономний прорахунок індикаторів без використання сторонніх бібліотек"""
+    if len(prices) < 30:
+        return 50, prices[-1], prices[-1], 0, 0, 0, 0
         
-        adx_ind = ta.trend.adx(df['High'], df['Low'], df['Close'], window=14)
-        current_adx = adx_ind.iloc[-1] if not adx_ind.empty else 0
-    except Exception:
-        current_atr, avg_atr, current_adx = 0, 0, 0
+    # 1. RSI (14)
+    gains = []
+    losses = []
+    for i in range(1, len(prices)):
+        diff = prices[i] - prices[i-1]
+        gains.append(diff if diff > 0 else 0)
+        losses.append(abs(diff) if diff < 0 else 0)
+        
+    avg_gain = sum(gains[-14:]) / 14
+    avg_loss = sum(losses[-14:]) / 14
+    rsi = 100 - (100 / (1 + (avg_gain / avg_loss))) if avg_loss != 0 else 100
+
+    # 2. Bollinger Bands (20, 2)
+    period_20 = prices[-20:]
+    sma_20 = sum(period_20) / 20
+    variance = sum((x - sma_20) ** 2 for x in period_20) / 20
+    std_dev = math.sqrt(variance)
+    upper_bb = sma_20 + (2 * std_dev)
+    lower_bb = sma_20 - (2 * std_dev)
+
+    # 3. ATR (проста заміна через амплітуду останніх свічок)
+    current_atr = abs(prices[-1] - prices[-2])
+    avg_atr = sum(abs(prices[i] - prices[i-1]) for i in range(-20, 0)) / 20
+
+    # 4. Емуляція MACD тренду
+    macd_fast = sum(prices[-12:]) / 12
+    macd_slow = sum(prices[-26:]) / 26
+    macd_line = macd_fast - macd_slow
+    signal_line = sum(prices[-9:]) / 9 - macd_slow
+    
+    return rsi, upper_bb, lower_bb, current_atr, avg_atr, macd_line, signal_line
+
+def analyze_market_condition(prices, asset):
+    rsi, upper_bb, lower_bb, current_atr, avg_atr, macd_line, signal_line = calculate_indicators(prices)
     
     news_events = fetch_economic_calendar()
     relevant_currencies = CURRENCY_MAP.get(asset, [])
@@ -83,55 +111,35 @@ def analyze_market_condition(df, asset):
                 pass
 
     if high_impact_news_active:
-        return "🔴 НЕ ТОРГУВАТИ (ВИХІД НОВИН)", "На ринку шторм через важливі економічні публікації. Технічні індикатори зараз не працюють.", news_warning
+        return "🔴 НЕ TОРГУВАТИ (ВИХІД НОВИН)", "На ринку шторм через важливі новини. Індикатори зараз не працюють.", news_warning
     elif current_atr > avg_atr * 1.5 and avg_atr > 0:
-        return "🔴 НЕ ТОРГУВАТИ (ВИСОКА ВОЛАТИЛЬНІСТЬ)", "Амплітуда коливань занадто хаотична. Краще перечекати.", news_warning
-    elif current_adx < 20:
-        return "🟡 ОБЕРЕЖНО (ФЛЕТ / СЛАБКИЙ РИНОК)", "Ціна затиснута в коридорі, об'єми низькі. Сигнали RSI на відскок від меж є більш надійними.", news_warning
-    elif current_adx > 25:
-        return "🟢 ЧУДОВИЙ СТАН (СИЛЬНИЙ ТРЕНД)", "На ринку чіткий прогнозований рух. Сприятливий час для торгівлі за трендом.", news_warning
+        return "🔴 НЕ TОРГУВАТИ (ВИСОКА ВОЛАТИЛЬНІСТЬ)", "Амплітуда коливань занадто хаотична. Краще перечекати.", news_warning
+    elif current_atr < avg_atr * 0.5 and avg_atr > 0:
+        return "名 ОБЕРЕЖНО (ФЛЕТ / СЛАБКИЙ РИНОК)", "Ціна майже стоїть на місці. Сигнали RSI на відскок є більш надійними.", news_warning
     else:
         return "🟢 СТАБІЛЬНИЙ РИНОК", "Умови в межах норми. Ринок спокійний і готовий до аналізу.", news_warning
 
-def generate_signals(df):
-    try:
-        rsi = ta.momentum.rsi(df['Close'], window=14)
-        
-        bb_low = ta.volatility.bollinger_lband(df['Close'], window=20, window_sign=2)
-        bb_high = ta.volatility.bollinger_hband(df['Close'], window=20, window_sign=2)
-        
-        macd_line = ta.trend.macd(df['Close'], window_fast=12, window_slow=26)
-        signal_line = ta.trend.macd_signal(df['Close'], window_fast=12, window_slow=26)
-        
-        curr_close = df['Close'].iloc[-1]
-        curr_rsi = rsi.iloc[-1]
-        lower_bb = bb_low.iloc[-1]
-        upper_bb = bb_high.iloc[-1]
-        
-        curr_macd = macd_line.iloc[-1]
-        curr_signal = signal_line.iloc[-1]
-        prev_macd = macd_line.iloc[-2] if len(macd_line) > 1 else curr_macd
-        prev_signal = signal_line.iloc[-2] if len(signal_line) > 1 else curr_signal
-    except Exception:
-        return "SCANNING...", 0, df['Close'].iloc[-1]
+def generate_signals(prices):
+    rsi, upper_bb, lower_bb, current_atr, avg_atr, macd_line, signal_line = calculate_indicators(prices)
+    curr_close = prices[-1]
     
     agree_count = 0
     direction = "SCANNING..."
     
-    is_rsi_oversold = curr_rsi < 35
+    is_rsi_oversold = rsi < 35
     is_bb_low = curr_close <= lower_bb
-    is_macd_bullish = curr_macd > curr_signal
+    is_macd_bullish = macd_line > signal_line
     
-    is_rsi_overbought = curr_rsi > 65
+    is_rsi_overbought = rsi > 65
     is_bb_high = curr_close >= upper_bb
-    is_macd_bearish = curr_macd < curr_signal
+    is_macd_bearish = macd_line < signal_line
 
-    if is_rsi_oversold or is_bb_low or (prev_macd <= prev_signal and is_macd_bullish):
+    if is_rsi_oversold or is_bb_low or is_macd_bullish:
         direction = "CALL 🟢"
         if is_rsi_oversold: agree_count += 1
         if is_bb_low: agree_count += 1
         if is_macd_bullish: agree_count += 1
-    elif is_rsi_overbought or is_bb_high or (prev_macd >= prev_signal and is_macd_bearish):
+    elif is_rsi_overbought or is_bb_high or is_macd_bearish:
         direction = "PUT 🔴"
         if is_rsi_overbought: agree_count += 1
         if is_bb_high: agree_count += 1
@@ -153,11 +161,12 @@ def analyze():
     try:
         ticker = yf.Ticker(asset)
         df = ticker.history(period="1d", interval=yf_interval)
-        if df.empty:
+        if df.empty or len(df) < 5:
             return jsonify({"error": "No data found"}), 400
-        
-        market_status, market_desc, news_warning = analyze_market_condition(df, asset)
-        signal_dir, confidence, entry_price = generate_signals(df)
+            
+        prices = df['Close'].tolist()
+        market_status, market_desc, news_warning = analyze_market_condition(prices, asset)
+        signal_dir, confidence, entry_price = generate_signals(prices)
         
         return jsonify({
             "market_status": market_status,
