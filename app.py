@@ -3,13 +3,12 @@ import datetime
 from flask import Flask, render_template_string, jsonify, request
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+import ta
 import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# Словник для мапінгу валютних пар на моніторинг новин Investing.com
 CURRENCY_MAP = {
     "EURUSD=X": ["EUR", "USD"],
     "GBPUSD=X": ["GBP", "USD"],
@@ -21,7 +20,6 @@ CURRENCY_MAP = {
 }
 
 def fetch_economic_calendar():
-    """Парсинг економічного календаря Investing.com у реальному часі"""
     url = "https://investing.com"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     events = []
@@ -54,13 +52,15 @@ def fetch_economic_calendar():
     return events
 
 def analyze_market_condition(df, asset):
-    """Аналіз волатильності, сили тренду та фільтрація новин"""
-    atr = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-    adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-    
-    current_atr = atr.iloc[-1] if atr is not None else 0
-    avg_atr = atr.rolling(window=20).mean().iloc[-1] if atr is not None else 0
-    current_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
+    try:
+        atr = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=14)
+        current_atr = atr.iloc[-1] if not atr.empty else 0
+        avg_atr = atr.rolling(window=20).mean().iloc[-1] if not atr.empty else 0
+        
+        adx_ind = ta.trend.adx(df['High'], df['Low'], df['Close'], window=14)
+        current_adx = adx_ind.iloc[-1] if not adx_ind.empty else 0
+    except Exception:
+        current_atr, avg_atr, current_adx = 0, 0, 0
     
     news_events = fetch_economic_calendar()
     relevant_currencies = CURRENCY_MAP.get(asset, [])
@@ -84,7 +84,7 @@ def analyze_market_condition(df, asset):
 
     if high_impact_news_active:
         return "🔴 НЕ ТОРГУВАТИ (ВИХІД НОВИН)", "На ринку шторм через важливі економічні публікації. Технічні індикатори зараз не працюють.", news_warning
-    elif current_atr > avg_atr * 1.5:
+    elif current_atr > avg_atr * 1.5 and avg_atr > 0:
         return "🔴 НЕ ТОРГУВАТИ (ВИСОКА ВОЛАТИЛЬНІСТЬ)", "Амплітуда коливань занадто хаотична. Краще перечекати.", news_warning
     elif current_adx < 20:
         return "🟡 ОБЕРЕЖНО (ФЛЕТ / СЛАБКИЙ РИНОК)", "Ціна затиснута в коридорі, об'єми низькі. Сигнали RSI на відскок від меж є більш надійними.", news_warning
@@ -94,36 +94,44 @@ def analyze_market_condition(df, asset):
         return "🟢 СТАБІЛЬНИЙ РИНОК", "Умови в межах норми. Ринок спокійний і готовий до аналізу.", news_warning
 
 def generate_signals(df):
-    """Генерація сигналів: RSI + Bollinger Bands + MACD"""
-    rsi = ta.rsi(df['Close'], length=14)
-    bb = ta.bbands(df['Close'], length=20, std=2)
-    macd = ta.macd(df['Close'], fast=12, slow=26, signal=9)
-    
-    curr_close = df['Close'].iloc[-1]
-    curr_rsi = rsi.iloc[-1]
-    lower_bb = bb['BBL_20_2.0'].iloc[-1]
-    upper_bb = bb['BBU_20_2.0'].iloc[-1]
-    
-    macd_line = macd['MACD_12_26_9'].iloc[-1]
-    signal_line = macd['MACDs_12_26_9'].iloc[-1]
+    try:
+        rsi = ta.momentum.rsi(df['Close'], window=14)
+        
+        bb_low = ta.volatility.bollinger_lband(df['Close'], window=20, window_sign=2)
+        bb_high = ta.volatility.bollinger_hband(df['Close'], window=20, window_sign=2)
+        
+        macd_line = ta.trend.macd(df['Close'], window_fast=12, window_slow=26)
+        signal_line = ta.trend.macd_signal(df['Close'], window_fast=12, window_slow=26)
+        
+        curr_close = df['Close'].iloc[-1]
+        curr_rsi = rsi.iloc[-1]
+        lower_bb = bb_low.iloc[-1]
+        upper_bb = bb_high.iloc[-1]
+        
+        curr_macd = macd_line.iloc[-1]
+        curr_signal = signal_line.iloc[-1]
+        prev_macd = macd_line.iloc[-2] if len(macd_line) > 1 else curr_macd
+        prev_signal = signal_line.iloc[-2] if len(signal_line) > 1 else curr_signal
+    except Exception:
+        return "SCANNING...", 0, df['Close'].iloc[-1]
     
     agree_count = 0
     direction = "SCANNING..."
     
     is_rsi_oversold = curr_rsi < 35
     is_bb_low = curr_close <= lower_bb
-    is_macd_bullish = macd_line > signal_line
+    is_macd_bullish = curr_macd > curr_signal
     
     is_rsi_overbought = curr_rsi > 65
     is_bb_high = curr_close >= upper_bb
-    is_macd_bearish = macd_line < signal_line
+    is_macd_bearish = curr_macd < curr_signal
 
-    if is_rsi_oversold or is_bb_low or (macd_line.iloc[-2] <= signal_line.iloc[-2] if len(macd) > 1 else False):
+    if is_rsi_oversold or is_bb_low or (prev_macd <= prev_signal and is_macd_bullish):
         direction = "CALL 🟢"
         if is_rsi_oversold: agree_count += 1
         if is_bb_low: agree_count += 1
         if is_macd_bullish: agree_count += 1
-    elif is_rsi_overbought or is_bb_high or (macd_line.iloc[-2] >= signal_line.iloc[-2] if len(macd) > 1 else False):
+    elif is_rsi_overbought or is_bb_high or (prev_macd >= prev_signal and is_macd_bearish):
         direction = "PUT 🔴"
         if is_rsi_overbought: agree_count += 1
         if is_bb_high: agree_count += 1
