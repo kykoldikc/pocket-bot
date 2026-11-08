@@ -1,0 +1,6 @@
+Flask
+yfinance
+pandas
+pandas-ta
+requests
+beautifulsoup4
