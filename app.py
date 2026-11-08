@@ -51,11 +51,9 @@ def fetch_economic_calendar():
     return events
 
 def calculate_indicators(prices):
-    """Автономний прорахунок індикаторів без використання сторонніх бібліотек"""
     if len(prices) < 30:
         return 50, prices[-1], prices[-1], 0, 0, 0, 0
         
-    # 1. RSI (14)
     gains = []
     losses = []
     for i in range(1, len(prices)):
@@ -67,7 +65,6 @@ def calculate_indicators(prices):
     avg_loss = sum(losses[-14:]) / 14
     rsi = 100 - (100 / (1 + (avg_gain / avg_loss))) if avg_loss != 0 else 100
 
-    # 2. Bollinger Bands (20, 2)
     period_20 = prices[-20:]
     sma_20 = sum(period_20) / 20
     variance = sum((x - sma_20) ** 2 for x in period_20) / 20
@@ -75,11 +72,9 @@ def calculate_indicators(prices):
     upper_bb = sma_20 + (2 * std_dev)
     lower_bb = sma_20 - (2 * std_dev)
 
-    # 3. ATR (проста заміна через амплітуду останніх свічок)
     current_atr = abs(prices[-1] - prices[-2])
     avg_atr = sum(abs(prices[i] - prices[i-1]) for i in range(-20, 0)) / 20
 
-    # 4. Емуляція MACD тренду
     macd_fast = sum(prices[-12:]) / 12
     macd_slow = sum(prices[-26:]) / 26
     macd_line = macd_fast - macd_slow
@@ -111,11 +106,11 @@ def analyze_market_condition(prices, asset):
                 pass
 
     if high_impact_news_active:
-        return "🔴 НЕ TОРГУВАТИ (ВИХІД НОВИН)", "На ринку шторм через важливі новини. Індикатори зараз не працюють.", news_warning
+        return "🔴 НЕ ТОРГУВАТИ (ВИХІД НОВИН)", "На ринку шторм через важливі новини. Індикатори зараз не працюють.", news_warning
     elif current_atr > avg_atr * 1.5 and avg_atr > 0:
-        return "🔴 НЕ TОРГУВАТИ (ВИСОКА ВОЛАТИЛЬНІСТЬ)", "Амплітуда коливань занадто хаотична. Краще перечекати.", news_warning
+        return "🔴 НЕ ТОРГУВАТИ (ВИСОКА ВОЛАТИЛЬНІСТЬ)", "Амплітуда коливань занадто хаотична. Краще перечекати.", news_warning
     elif current_atr < avg_atr * 0.5 and avg_atr > 0:
-        return "名 ОБЕРЕЖНО (ФЛЕТ / СЛАБКИЙ РИНОК)", "Ціна майже стоїть на місці. Сигнали RSI на відскок є більш надійними.", news_warning
+        return "🟡 ОБЕРЕЖНО (ФЛЕТ / СЛАБКИЙ РИНОК)", "Ціна майже стоїть на місці. Сигнали RSI на відскок є більш надійними.", news_warning
     else:
         return "🟢 СТАБІЛЬНИЙ РИНОК", "Умови в межах норми. Ринок спокійний і готовий до аналізу.", news_warning
 
@@ -186,7 +181,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pocket Option Signal App</title>
-    <script src="https://jsdelivr.net"></script>
+    <link href="https://jsdelivr.net" rel="stylesheet">
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4">
     <div class="max-w-md mx-auto space-y-4">
