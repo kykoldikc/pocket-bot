@@ -1,6 +1,7 @@
 Flask
 yfinance
 pandas
-pandas-ta
+pandas-ta==0.3.14b
+numpy<2.0.0
 requests
 beautifulsoup4
