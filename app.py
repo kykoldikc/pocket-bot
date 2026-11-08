@@ -181,66 +181,79 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pocket Option Signal App</title>
-    <link href="https://jsdelivr.net" rel="stylesheet">
+    <style>
+        body { background-color: #111827; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 15px; margin: 0; }
+        .card { background-color: #1f2937; padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1 { color: #34d399; font-size: 18px; margin: 0 0 5px 0; font-weight: bold; letter-spacing: 1px; text-align: center; }
+        h2 { font-size: 12px; color: #9ca3af; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 0.5px; }
+        label { font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px; }
+        select { w-index: 10; width: 100%; bg-color: #374151; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; font-size: 14px; margin-bottom: 10px; outline: none; box-sizing: border-box; }
+        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        button:active { background-color: #1d4ed8; }
+        .badge { padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; font-size: 14px; background-color: #374151; color: #d1d5db; margin-bottom: 8px; }
+        .flex-row { display: flex; justify-content: space-between; align-items: center; background-color: #111827; padding: 10px; border-radius: 8px; border: 1px solid #374151; }
+        .grid-2 { display: grid; grid-template-cols: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .grid-item { background-color: #111827; padding: 8px; border-radius: 6px; border: 1px solid #374151; }
+        .grid-item span { display: block; font-size: 11px; color: #6b7280; }
+        .grid-item font { font-weight: bold; font-size: 14px; color: white; }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4">
-    <div class="max-w-md mx-auto space-y-4">
-        <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 text-center">
-            <h1 class="text-xl font-bold text-green-400 tracking-wider">POCKET OPTION ANALYZER</h1>
-            <p class="text-xs text-gray-400 mt-1">Сигнали та Волатильність у реальному часі</p>
+<body>
+    <div style="max-width: 400px; margin: 0 auto;">
+        <!-- Header -->
+        <div class="card" style="text-align: center;">
+            <h1>POCKET OPTION ANALYZER</h1>
+            <div style="font-size: 11px; color: #9ca3af;">Сигнали та Волатильність у реальному часі</div>
         </div>
 
-        <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 space-y-3">
-            <div>
-                <label class="text-xs text-gray-400 block mb-1">Виберіть Актив:</label>
-                <select id="assetSelect" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
-                    <option value="EURUSD=X">EUR/USD</option>
-                    <option value="GBPUSD=X">GBP/USD</option>
-                    <option value="USDCAD=X">USD/CAD</option>
-                    <option value="USDJPY=X">USD/JPY</option>
-                    <option value="BTC-USD">BTC/USD (Crypto)</option>
-                </select>
-            </div>
-            <div>
-                <label class="text-xs text-gray-400 block mb-1">Час Експірації:</label>
-                <select id="intervalSelect" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
-                    <option value="1m">1 Хвилина</option>
-                    <option value="2m">2 Хвилини</option>
-                    <option value="5m">5 Хвилин</option>
-                    <option value="15m">15 Хвилин</option>
-                </select>
-            </div>
-            <button id="analyzeBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold p-3 rounded-lg text-sm transition shadow-md">
-                🔄 АНАЛІЗУВАТИ РИНОК
-            </button>
+        <!-- Налаштування -->
+        <div class="card">
+            <label>Виберіть Актив:</label>
+            <select id="assetSelect">
+                <option value="EURUSD=X">EUR/USD</option>
+                <option value="GBPUSD=X">GBP/USD</option>
+                <option value="USDCAD=X">USD/CAD</option>
+                <option value="USDJPY=X">USD/JPY</option>
+                <option value="BTC-USD">BTC/USD (Crypto)</option>
+            </select>
+            
+            <label>Час Експірації:</label>
+            <select id="intervalSelect">
+                <option value="1m">1 Хвилина</option>
+                <option value="2m">2 Хвилини</option>
+                <option value="5m">5 Хвилин</option>
+                <option value="15m">15 Хвилин</option>
+            </select>
+            
+            <button id="analyzeBtn">🔄 АНАЛІЗУВАТИ РИНОК</button>
         </div>
 
-        <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 space-y-2">
-            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">📊 Волатильність ринку та Новини</h2>
-            <div id="marketBadge" class="p-3 rounded-lg font-bold text-center text-sm bg-gray-700 text-gray-300">
-                НАТИСНІТЬ АНАЛІЗ ДЛЯ МОНІТОРИНГУ
-            </div>
-            <p id="marketDesc" class="text-xs text-gray-400 italic px-1"></p>
-            <div id="newsWarning" class="text-xs text-yellow-500 font-medium border-t border-gray-700 pt-2 mt-2"></div>
+        <!-- Волатильність -->
+        <div class="card">
+            <h2>📊 Волатильність ринку та Новини</h2>
+            <div id="marketBadge" class="badge">НАТИСНІТЬ АНАЛІЗ ДЛЯ МОНІТОРИНГУ</div>
+            <div id="marketDesc" style="font-size: 12px; color: #9ca3af; font-style: italic;"></div>
+            <div id="newsWarning" style="font-size: 12px; color: #f59e0b; font-weight: 500; margin-top: 8px; border-top: 1px solid #374151; padding-top: 6px;"></div>
         </div>
 
-        <div class="bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700 space-y-3">
-            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">🎯 Поточний Сигнал</h2>
-            <div class="flex justify-between items-center bg-gray-900 p-3 rounded-lg border border-gray-700">
-                <span class="text-sm font-medium">Напрямок угоди:</span>
-                <span id="signalDir" class="text-lg font-black tracking-wide text-gray-400">---</span>
+        <!-- Сигнал -->
+        <div class="card">
+            <h2>🎯 Поточний Сигнал</h2>
+            <div class="flex-row">
+                <span style="font-size: 14px;">Напрямок угоди:</span>
+                <span id="signalDir" style="font-size: 18px; font-weight: 900; color: #9ca3af;">---</span>
             </div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div class="bg-gray-900 p-2 rounded border border-gray-700">
-                    <span class="text-gray-500 block">Впевненість:</span>
-                    <span id="confidenceVal" class="font-bold text-sm text-white">0%</span>
+            <div class="grid-2">
+                <div class="grid-item">
+                    <span>Впевненість:</span>
+                    <font id="confidenceVal">0%</font>
                 </div>
-                <div class="bg-gray-900 p-2 rounded border border-gray-700">
-                    <span class="text-gray-500 block">Ціна входу:</span>
-                    <span id="entryPrice" class="font-bold text-sm text-white">0.0000</span>
+                <div class="grid-item">
+                    <span>Ціна входу:</span>
+                    <font id="entryPrice">0.0000</font>
                 </div>
             </div>
-            <p class="text-[10px] text-gray-500 text-center">Останнє оновлення: <span id="updateTime">Ніколи</span></p>
+            <div style="font-size: 10px; color: #4b5563; text-align: center; margin-top: 8px;">Останнє оновлення: <span id="updateTime">Ніколи</span></div>
         </div>
     </div>
 
@@ -263,11 +276,11 @@ HTML_TEMPLATE = """
                     const badge = document.getElementById('marketBadge');
                     badge.innerText = data.market_status;
                     if (data.market_status.includes('🔴')) {
-                        badge.className = "p-3 rounded-lg font-bold text-center text-sm bg-red-950 text-red-400 border border-red-800";
+                        badge.style.backgroundColor = "#450a0a"; badge.style.color = "#f87171"; badge.style.border = "1px solid #991b1b";
                     } else if (data.market_status.includes('🟡')) {
-                        badge.className = "p-3 rounded-lg font-bold text-center text-sm bg-yellow-950 text-yellow-400 border border-yellow-800";
+                        badge.style.backgroundColor = "#451a03"; badge.style.color = "#fbbf24"; badge.style.border = "1px solid #92400e";
                     } else {
-                        badge.className = "p-3 rounded-lg font-bold text-center text-sm bg-green-950 text-green-400 border border-green-800";
+                        badge.style.backgroundColor = "#064e3b"; badge.style.color = "#34d399"; badge.style.border = "1px solid #065f46";
                     }
                     
                     document.getElementById('marketDesc').innerText = data.market_desc;
@@ -275,9 +288,9 @@ HTML_TEMPLATE = """
 
                     const sigDir = document.getElementById('signalDir');
                     sigDir.innerText = data.signal_direction;
-                    if (data.signal_direction.includes('🟢')) sigDir.className = "text-lg font-black text-green-400";
-                    else if (data.signal_direction.includes('🔴')) sigDir.className = "text-lg font-black text-red-500";
-                    else sigDir.className = "text-lg font-black text-gray-400";
+                    if (data.signal_direction.includes('🟢')) sigDir.style.color = "#34d399";
+                    else if (data.signal_direction.includes('🔴')) sigDir.style.color = "#f87171";
+                    else sigDir.style.color = "#9ca3af";
 
                     document.getElementById('confidenceVal').innerText = data.confidence;
                     document.getElementById('entryPrice').innerText = data.entry_price;
