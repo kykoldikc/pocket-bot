@@ -1,7 +1,5 @@
 Flask
 yfinance
-pandas<2.2.0
-ta
 requests
 beautifulsoup4
 
